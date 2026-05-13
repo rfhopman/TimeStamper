@@ -7,128 +7,110 @@ from streamlit_gsheets import GSheetsConnection
 
 # --- Configuration ---
 st.set_page_config(page_title="Service Evaluator Pro", layout="centered")
-
-# Initialize LocalStorage with a specific key
-local_storage = LocalStorage(key="service_eval_v1")
-
-# Establish Google Sheets Connection
-# Ensure you have set up your credentials in Streamlit Secrets
+local_storage = LocalStorage()
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Initialize session state from local storage (iPhone memory)
 if 'logs' not in st.session_state:
     try:
         stored_data = local_storage.get("eval_logs")
-        st.session_state.logs = stored_data if stored_data is not None else []
+        st.session_state.logs = stored_data if stored_data else []
     except Exception:
         st.session_state.logs = []
 
-def add_log(category, action):
-    # Timezone Logic (Fixed -4 offset for your location)
+def add_entry(q_num, task, status, comment):
     local_tz = pytz.timezone('America/Aruba') 
-    now_utc = datetime.now(pytz.utc)
-    now_local = now_utc.astimezone(local_tz)
-    timestamp_str = now_local.strftime("%I:%M:%S %p")
+    now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
     entry = {
-        "Timestamp": timestamp_str,
-        "Category": category,
-        "Action": action
+        "Timestamp": now_local.strftime("%I:%M:%S %p"),
+        "ID": q_num,
+        "Task": task,
+        "Status": status,
+        "Comment": comment
     }
     
-    # 1. Save to Session State
     st.session_state.logs.append(entry)
-    
-    # 2. Sync to iPhone Local Storage immediately
-    local_storage.set("eval_logs", st.session_state.logs)
-    
-    # 3. Sync to Google Sheets Cloud
     try:
+        local_storage.set("eval_logs", st.session_state.logs)
         new_row = pd.DataFrame([entry])
         conn.create(data=new_row)
-    except Exception as e:
-        st.warning(f"Cloud sync pending: {e}")
+        st.toast(f"Logged: {q_num}")
+    except Exception:
+        st.error("Storage sync failed, but entry kept in session.")
 
-st.title("⏱️ Service Evaluation Tracker")
-st.caption("Auto-syncing to iPhone and Google Sheets")
+st.title("📋 Service Evaluation Form")
 
-# --- UI Sections (Vertical for Mobile) ---
+# Helper function to create the UI blocks seen in your screenshots
+def question_block(q_num, text, category):
+    with st.container(border=True):
+        st.markdown(f"**{q_num}. {text}**")
+        col1, col2 = st.columns([1, 1])
+        status = st.radio("Status", ["Yes", "No", "N/A"], key=f"rad_{q_num}", horizontal=True, label_visibility="collapsed")
+        comment = st.text_area("Comment:", key=f"comm_{q_num}", height=68)
+        if st.button(f"Log {q_num}", key=f"btn_{q_num}", use_container_width=True):
+            add_entry(q_num, text, status, comment)
+
+# --- Sections based on Screenshots ---
 
 with st.expander("👤 Management", expanded=False):
-    # From Screenshot 2026-05-13 at 7.07.42 PM.png
-    mgt = ["Interacted with Bar", "Engaged at Door/Floor", "Table Contact", 
-           "Satisfaction Check", "Follow-up on Complaints", "Professional Demeanor",
-           "Food/Wine Knowledge", "Professional Dress"]
-    for act in mgt:
-        if st.button(act, key=f"mgt_{act}", use_container_width=True):
-            add_log("Management", act)
+    # Ref: Screenshot 2026-05-13 at 7.07.42 PM.png
+    mgt_tasks = [
+        ("108", "Management interacted with bar guests who are dining."),
+        ("109", "Management was engaged with staff at door and/or on the service floor."),
+        ("110", "Management made personal contact with your table."),
+        ("111", "Manager visited your table to ensure your satisfaction."),
+        ("113", "Management demeanor was professional and upbeat; seen smiling."),
+        ("116", "Manager dressed professionally.")
+    ]
+    for q, txt in mgt_tasks:
+        question_block(q, txt, "Management")
 
 with st.expander("🤝 Service Quality", expanded=False):
-    # From Screenshot 2026-05-13 at 7.07.24 PM.png
-    srv = ["Dessert within 12m", "Checked on Dessert", "Check within 2m", 
-           "Leftover Wrap Offered", "Thanked w/ Eye Contact", "Busser 'May I?' Request",
-           "Server Available/Accessible", "Anticipated Needs"]
-    for act in srv:
-        if st.button(act, key=f"srv_{act}", use_container_width=True):
-            add_log("Service", act)
+    # Ref: Screenshot 2026-05-13 at 7.07.24 PM.png
+    srv_tasks = [
+        ("88", "Dessert served within 12 minutes of order."),
+        ("89", "Server checked on dessert."),
+        ("90", "Check was presented to host within two minutes of request."),
+        ("92", "You were thanked sincerely with eye contact."),
+        ("93", "Busser made eye contact and specifically asked, 'May I?' before clearing items."),
+        ("98", "Server was available and readily accessible.")
+    ]
+    for q, txt in srv_tasks:
+        question_block(q, txt, "Service")
 
 with st.expander("🍽️ Table & Glassware", expanded=False):
-    # From Screenshot 2026-05-13 at 7.07.32 PM.png
-    tbl = ["Cocktail Offered", "Coffee/Digestif Offered", "Automatic Refills", 
-           "Silverware Polished", "Table Settings Neat", "Glassware Clean", "China No Defects"]
-    for act in tbl:
-        if st.button(act, key=f"tbl_{act}", use_container_width=True):
-            add_log("Table Setting", act)
-
-with st.expander("🍳 Kitchen & Food", expanded=False):
-    # From Screenshot 2026-05-13 at 7.08.09 PM.png
-    kit = ["Visually Appealing", "Beverage Proper", "Correct Temp", 
-           "Prepared as Requested", "Exceptional Flavor", "Fresh Ingredients",
-           "Diverse Offerings", "Recommend Based on Food"]
-    for act in kit:
-        if st.button(act, key=f"kit_{act}", use_container_width=True):
-            add_log("Kitchen", act)
-
-with st.expander("🏢 Facility", expanded=False):
-    # From Screenshot 2026-05-13 at 7.08.24 PM.png
-    fac = ["Sidewalk Maintained", "Entry Lit", "Windows Clean", "Door/Handle Good",
-           "Podium Organized", "Foyer Clean", "Linens Clean", "Floor/Walls Clean",
-           "Lighting Appropriate", "Tables/Chairs Sturdy", "Comfortable Temp"]
-    for act in fac:
-        if st.button(act, key=f"fac_{act}", use_container_width=True):
-            add_log("Facility", act)
+    # Ref: Screenshot 2026-05-13 at 7.07.32 PM.png
+    tbl_tasks = [
+        ("101", "Specific cocktails or beverage were offered on first visit."),
+        ("102", "Coffee/tea, cappuccino, espresso and/or digestifs were offered."),
+        ("103", "Coffee refills are automatic."),
+        ("104", "Silverware was polished; no water spots or bent tines."),
+        ("106", "Glassware: Clean, free of blemishes.")
+    ]
+    for q, txt in tbl_tasks:
+        question_block(q, txt, "Table Setting")
 
 with st.expander("🚽 Restroom", expanded=False):
-    # From Screenshot 2026-05-13 at 7.08.16 PM.png
-    if st.button("Restroom Visit Start", use_container_width=True):
-        add_log("Restroom", "Visit Start")
-    rst = ["Fully Supplied", "Neat and Odor Free", "Waste Not Overflowing"]
-    for act in rst:
-        if st.button(act, key=f"rst_{act}", use_container_width=True):
-            add_log("Restroom", act)
-
-with st.expander("⭐ Final Impressions", expanded=False):
-    # From Screenshot 2026-05-13 at 7.08.36 PM.png
-    loy = ["Return/Spend Own Money", "Recommend Service", "Recommend Food", 
-           "Staff Teamwork", "Welcomed/Cared For", "Staff Energy/Enthusiasm"]
-    for act in loy:
-        if st.button(act, key=f"loy_{act}", use_container_width=True):
-            add_log("Loyalty", act)
+    # Ref: Screenshot 2026-05-13 at 7.08.16 PM.png
+    rst_tasks = [
+        ("132", "Restroom was fully supplied."),
+        ("133", "Restroom was neat and odor free."),
+        ("134", "Waste receptacle not overflowing.")
+    ]
+    for q, txt in rst_tasks:
+        question_block(q, txt, "Restroom")
 
 st.divider()
 
-# --- Data Review & Export ---
+# --- Data Management ---
 if st.session_state.logs:
     df = pd.DataFrame(st.session_state.logs)
-    st.subheader("Current Log")
-    st.dataframe(df.sort_index(ascending=False), use_container_width=True)
+    st.dataframe(df, use_container_width=True)
     
     csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download CSV", csv, "eval_report.csv", "text/csv", use_container_width=True)
+    st.download_button("📥 Download Final Report", csv, "evaluation.csv", "text/csv", use_container_width=True)
     
     if st.button("🚨 Clear All Progress", use_container_width=True):
         local_storage.delete("eval_logs")
         st.session_state.logs = []
         st.rerun()
-else:
-    st.info("No tasks logged yet. Tap a category above to begin.")
