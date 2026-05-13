@@ -1,5 +1,5 @@
 streamlit
-pandas==2.2.0
-yfinance
-ib_insync
-scipy
+pandas
+pytz
+streamlit-local-storage
+st-gsheets-connection
