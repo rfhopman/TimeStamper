@@ -1,75 +1,103 @@
 import streamlit as st
 import pandas as pd
+import pytz
 from datetime import datetime
+from streamlit_local_storage import LocalStorage
 
-# Page configuration for mobile
-st.set_page_config(page_title="Task Logger", layout="centered")
+# --- Configuration & Persistence ---
+st.set_page_config(page_title="Service Evaluator", layout="centered")
+local_storage = LocalStorage()
 
-# Initialize session state for data storage
+# Load data from iPhone's browser cache if session was interrupted
 if 'logs' not in st.session_state:
-    st.session_state.logs = []
+    stored_data = local_storage.get("eval_logs")
+    st.session_state.logs = stored_data if stored_data else []
 
 def add_log(category, action):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.session_state.logs.append({
-        "Timestamp": now,
+    # Local Time Adjustment (-4 UTC)
+    local_tz = pytz.timezone('America/Aruba') 
+    now_local = datetime.now(pytz.utc).astimezone(local_tz)
+    timestamp_str = now_local.strftime("%I:%M:%S %p")
+    
+    entry = {
+        "Timestamp": timestamp_str,
         "Category": category,
         "Action": action
-    })
+    }
+    
+    st.session_state.logs.append(entry)
+    # Save to local storage immediately so data isn't lost on sleep/refresh
+    local_storage.set("eval_logs", st.session_state.logs)
 
-st.title("⏱️ Activity Tracker")
+st.title("📋 Service Evaluation Log")
 
-# --- UI Layout ---
-# Using expanders to keep the mobile interface clean
-with st.expander("🛎️ Front Desk", expanded=True):
-    for action in ["Arrival", "Wait", "Departure"]:
-        if st.button(f"FD: {action}", use_container_width=True):
-            add_log("Front Desk", action)
+# --- Categories from Screenshots ---
 
-with st.expander("🍸 Bar / Restaurant", expanded=False):
-    actions = ["Seated", "Greeted", "Orders", "Served", "Payment", "Departure"]
-    for action in actions:
-        if st.button(f"Bar: {action}", use_container_width=True):
-            add_log("Bar/Restaurant", action)
+# Management (Ref: Screenshot 2026-05-13 at 7.07.42 PM.png)
+with st.expander("👤 Management", expanded=False):
+    mgt_actions = ["Interacted with Bar", "Engaged at Door/Floor", "Table Contact", "Satisfaction Check", "Complaint Follow-up"]
+    for act in mgt_actions:
+        if st.button(act, use_container_width=True):
+            add_log("Management", act)
 
-with st.expander("🍽️ Table Service", expanded=False):
-    ts_actions = [
-        "Drinks Ordered", "Drinks Delivered", 
-        "Appetizer Ordered", "Appetizer Served",
-        "Entrée Ordered", "Entrée Served",
-        "Dessert Ordered", "Dessert Served",
-        "Check Back", "Check Requested", 
-        "Check Provided", "Payment Taken", 
-        "Check Settled", "Departure"
-    ]
-    for action in ts_actions:
-        if st.button(f"TS: {action}", use_container_width=True):
-            add_log("Table Service", action)
+# Service Quality (Ref: Screenshot 2026-05-13 at 7.07.24 PM.png)
+with st.expander("🤝 Service Details", expanded=False):
+    srv_actions = ["Dessert within 12m", "Check on Dessert", "Check within 2m", "Leftover Wrap Offered", "Thanked w/ Eye Contact", "Busser 'May I?' Request"]
+    for act in srv_actions:
+        if st.button(act, use_container_width=True):
+            add_log("Service", act)
 
-with st.expander("🚽 Facilities", expanded=False):
-    if st.button("Restroom Visit", use_container_width=True):
-        add_log("Facilities", "Restroom Visit")
+# Table Setting (Ref: Screenshot 2026-05-13 at 7.07.32 PM.png)
+with st.expander("🍽️ Table & Glassware", expanded=False):
+    tbl_actions = ["Cocktail Offered", "Coffee/Digestif Offered", "Automatic Refill", "Silverware Polished", "Settings Neat", "Glassware Clean"]
+    for act in tbl_actions:
+        if st.button(act, use_container_width=True):
+            add_log("Table Setting", act)
 
----
+# Kitchen & Food (Ref: Screenshot 2026-05-13 at 7.08.09 PM.png)
+with st.expander("🍳 Kitchen & Food", expanded=False):
+    kit_actions = ["Visually Appealing", "Beverage Proper", "Correct Temp", "Prepared as Requested", "Exceptional Flavor", "Fresh Ingredients"]
+    for act in kit_actions:
+        if st.button(act, use_container_width=True):
+            add_log("Kitchen", act)
 
-### Data Log
+# Facility (Ref: Screenshot 2026-05-13 at 7.08.24 PM.png)
+with st.expander("🏢 Facility Condition", expanded=False):
+    fac_actions = ["Sidewalk Maintained", "Entry Lit", "Windows Clean", "Podium Organized", "Linens Clean", "Lighting Appropriate"]
+    for act in fac_actions:
+        if st.button(act, use_container_width=True):
+            add_log("Facility", act)
+
+# Restroom (Ref: Screenshot 2026-05-13 at 7.08.16 PM.png)
+with st.expander("🚽 Restroom", expanded=False):
+    if st.button("Restroom Visit Start", use_container_width=True):
+        add_log("Restroom", "Visit Start")
+    rest_actions = ["Fully Supplied", "Neat/Odor Free", "Waste Not Overflowing"]
+    for act in rest_actions:
+        if st.button(act, use_container_width=True):
+            add_log("Restroom", act)
+
+# Final Sentiment (Ref: Screenshot 2026-05-13 at 7.08.36 PM.png)
+with st.expander("⭐ Final Impressions", expanded=False):
+    sent_actions = ["Return/Spend Own Money", "Recommend (Service)", "Recommend (Food)", "Staff Teamwork", "Welcomed/Cared For"]
+    for act in sent_actions:
+        if st.button(act, use_container_width=True):
+            add_log("Loyalty", act)
+
+st.divider()
+
+# --- Data Display & Export ---
 if st.session_state.logs:
     df = pd.DataFrame(st.session_state.logs)
-    # Display newest first for easy viewing on phone
     st.dataframe(df.sort_index(ascending=False), use_container_width=True)
     
-    # Download Section
     csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Download CSV",
-        data=csv,
-        file_name=f"activity_log_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime='text/csv',
-        use_container_width=True
-    )
+    st.download_button("📥 Download Final Report", csv, "service_eval.csv", "text/csv", use_container_width=True)
     
-    if st.button("🗑️ Clear All Logs", use_container_width=True):
+    if st.button("🚨 Clear App Cache", use_container_width=True):
+        local_storage.delete("eval_logs")
         st.session_state.logs = []
         st.rerun()
 else:
+    st.info("Start tapping buttons to log service events.")
     st.info("No activity logged yet.")
