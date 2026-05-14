@@ -188,20 +188,33 @@ if 'logs' not in st.session_state:
 def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
-    entry = {
+    
+    # 1. Create the data row
+    new_row = pd.DataFrame([{
         "Timestamp": now_local.strftime("%Y-%m-%d %I:%M:%S %p"),
-        "Q_ID": int(q_id),
+        "Q_ID": str(q_id), # Keeping as string to avoid formatting issues
         "Question": question,
         "Response": str(response),
         "Comment": comment
-    }
-    st.session_state.logs.append(entry)
+    }])
+    
+    # 2. Log to local session state first
+    st.session_state.logs.append(new_row.to_dict('records')[0])
+    
     try:
+        # Update local browser storage
         local_storage.set("eval_logs", st.session_state.logs)
-        conn.create(data=pd.DataFrame([entry]))
-        st.toast(f"✅ Q{q_id} Logged")
-    except Exception:
-        st.error(f"Sync Issue. Check Sheet sharing settings.")
+        
+        # 3. Use 'append' logic specifically for the 'Service_Logs' sheet
+        # This is more stable than .create() in newer Streamlit versions
+        conn.create(
+            worksheet="Sheet1", # Ensure this matches your tab name at the bottom of the Sheet
+            data=new_row
+        )
+        st.toast(f"✅ Q{q_id} Logged to Google")
+    except Exception as e:
+        # Show the actual error so we can see why Google is rejecting it
+        st.error(f"Google Sync Error: {str(e)}")
 
 def render_q(q_id):
     text = AUDIT_QUESTIONS.get(str(q_id))
