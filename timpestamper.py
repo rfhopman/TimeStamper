@@ -243,45 +243,41 @@ with tabs[3]:
 with tabs[4]:
     for i in range(121, 154): render_q(i)
 
-# --- Updated Clear Logic to prevent AttributeError ---
-if st.button("🗑️ Clear All Logs", use_container_width=True):
-    # 1. Clear session state immediately
-    st.session_state.logs = []
-    
-    # 2. Safely update local storage
-    try:
-        if local_storage:
-            local_storage.set("eval_logs", [])
-    except Exception:
-        # Ignore errors here so the app doesn't crash on your phone
-        pass
-        
-    st.rerun()
-
-# --- REPLACED bottom section (after the tabs) ---
+# --- LOG DISPLAY, DOWNLOAD, & CLEAR LOGIC ---
 st.divider()
 st.subheader("Current Session Logs")
 
 if st.session_state.logs:
     df_logs = pd.DataFrame(st.session_state.logs)
     
-    # Show the table BEFORE the download button so it doesn't disappear
+    # 1. Show the table first
     st.table(df_logs)
     
-    # Create the CSV data
+    # 2. Download Button (Modified to prevent session loss)
     csv_data = df_logs.to_csv(index=False).encode('utf-8')
-    
-    # This button allows you to save the file without leaving the app
     st.download_button(
-        label="📥 Download & Backup Audit (CSV)",
+        label="📥 Download Audit (CSV)",
         data=csv_data,
-        file_name=f"audit_backup_{datetime.now().strftime('%H%M')}.csv",
+        file_name=f"audit_{datetime.now().strftime('%m%d_%H%M')}.csv",
         mime="text/csv",
         use_container_width=True,
+        key="main_download_btn" # Unique key
     )
     
-    if st.button("🗑️ Clear All Logs", use_container_width=True):
-        st.session_state.logs = []
-        st.rerun()
+    # 3. Clear Buttons with UNIQUE keys
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ Clear Local View", use_container_width=True, key="clear_view_btn"):
+            st.session_state.logs = []
+            st.rerun()
+            
+    with col2:
+        if st.button("🚨 Reset App", use_container_width=True, key="reset_app_btn"):
+            try:
+                local_storage.set("eval_logs", [])
+            except:
+                pass
+            st.session_state.logs = []
+            st.rerun()
 else:
     st.info("No items logged yet. Use the buttons above to start.")
