@@ -197,23 +197,27 @@ def add_entry(q_id, question, response, comment=""):
         "Comment": comment
     }
     
-    # Save to session state for local display
+    # Save to session state for local app view
     st.session_state.logs.append(entry)
     
     try:
         # 1. Convert entry to DataFrame
         df_to_append = pd.DataFrame([entry])
         
-        # 2. Use conn.update instead of conn.create
-        # This will append the data to the existing Sheet1
-        conn.update(
+        # 2. Use conn.append_wd (Append With Data) 
+        # This is the most reliable way to add a row to the bottom without overwriting
+        conn.append_wd(
             worksheet="Sheet1", 
-            data=df_to_append,
-            ttl=0
+            data=df_to_append
         )
         st.toast(f"✅ Q{q_id} Logged to Google Sheets")
     except Exception as e:
-        st.error(f"Sync Issue: {e}")
+        # If append_wd fails, fall back to update without the ttl argument
+        try:
+            conn.update(worksheet="Sheet1", data=df_to_append)
+            st.toast(f"✅ Q{q_id} Updated in Google Sheets")
+        except Exception as update_err:
+            st.error(f"Sync Issue: {update_err}")
         
 def render_q(q_id):
     text = AUDIT_QUESTIONS.get(str(q_id))
