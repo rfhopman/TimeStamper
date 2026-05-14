@@ -2,28 +2,17 @@ import streamlit as st
 import pandas as pd
 import pytz
 from datetime import datetime
-from streamlit_local_storage import LocalStorage
+from streamlit_gsheets import GSheetsConnection
 
 # --- Setup ---
 st.set_page_config(page_title="Audit Pro 153", layout="centered")
 
-# 1. Initialize the component
-local_storage = LocalStorage()
+# Initialize Connection
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 2. SAFE RECOVERY LOGIC
+# --- Initialize Session Memory ---
 if 'logs' not in st.session_state:
     st.session_state.logs = []
-    
-    # We use a try/except block to catch the "handshake" error
-    try:
-        stored_data = local_storage.get("audit_backup")
-        # If stored_data is a list and not empty, load it
-        if stored_data and isinstance(stored_data, list):
-            st.session_state.logs = stored_data
-    except Exception:
-        # If the browser isn't ready, we just start with an empty list
-        # The next time you "Add to Note", it will sync up
-        pass
         
 # --- THE COMPLETE 1-153 QUESTION DATABASE ---
 AUDIT_QUESTIONS = {
@@ -199,25 +188,32 @@ def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
-    entry = {
-        "Time": now_local.strftime("%I:%M %p"),
-        "Q_ID": f"Q{q_id}",
-        "Question": question,
-        "Result": response,
-        "Note": comment if comment else "-"
-    }
-    st.session_state.logs.append(entry)
+    timestamp = now_local.strftime("%Y-%m-%d %I:%M:%S %p")
+    entry_list = [timestamp, f"Q{q_id}", question, str(response), comment]
     
-    # --- 2. THE PERSISTENCE STEP ---
-    # Every time a question is logged, we save the whole list to the phone's memory
-    local_storage.set("audit_backup", st.session_state.logs)
-    st.toast(f"✅ Saved to Phone Memory: Q{q_id}")
+    # 1. Update the app screen immediately
+    st.session_state.logs.append({
+        "Time": timestamp, "Q": f"Q{q_id}", "Result": response, "Note": comment
+    })
+    
+    try:
+        # 2. THE FORCE-APPEND FIX
+        # We access the internal spreadsheet directly to avoid the 'AttributeError'
+        client = conn._instance  # This is the secret to getting the real GSheets tool
+        sheet = client.open_as_worksheet("Sheet1")
+        sheet.append_row(entry_list)
+        
+        st.toast(f"✅ Synced to Cloud: Q{q_id}")
+    except Exception as e:
+        st.error(f"Sync Issue: {e}")
+        # Even if sync fails, the data stays in the app list below!
 
 def render_q(q_id):
     text = AUDIT_QUESTIONS.get(str(q_id), "Question not found")
     with st.container(border=True):
         st.markdown(f"**{q_id}. {text}**")
         
+        # Handle input types
         if q_id == 145:
             res = st.select_slider("Score", options=list(range(11)), key=f"r_{q_id}")
         elif q_id in [144, 153]:
@@ -226,10 +222,10 @@ def render_q(q_id):
             res = st.radio("Selection", ["Yes", "No", "N/A"], key=f"r_{q_id}", horizontal=True)
             
         comm = st.text_input("Comment", key=f"c_{q_id}")
-        if st.button(f"Add to Note", key=f"b_{q_id}", use_container_width=True):
+        if st.button(f"Add & Sync", key=f"b_{q_id}", use_container_width=True):
             add_entry(q_id, text, res, comm)
 
-st.title("📝 Persistent Audit Note")
+st.title("🛡️ Audit Pro (Cloud Sync)")
 
 # --- Tabs ---
 tabs = st.tabs(["1-30", "31-60", "61-90", "91-120", "121-153"])
@@ -240,42 +236,18 @@ for idx, t in enumerate(tabs):
         for i in range(start, end):
             render_q(i)
 
-# --- SIDEBAR ---
+# --- SIDEBAR: DOWNLOAD & VIEW ---
 st.sidebar.header("Audit Summary")
-
 if st.session_state.logs:
-    # Text Note Preview
-    note_text = "SERVICE AUDIT LOG\n" + "="*20 + "\n"
-    for l in st.session_state.logs:
-        note_text += f"[{l['Time']}] {l['Q_ID']}: {l['Result']} | Note: {l['Note']}\n"
-    
-    st.sidebar.text_area("Live Note Preview", value=note_text, height=300)
-    
-    # CSV Data
     df_logs = pd.DataFrame(st.session_state.logs)
-    csv_data = df_logs.to_csv(index=False).encode('utf-8')
-    
     st.sidebar.download_button(
-        label="💾 Save as Text (Notes)",
-        data=note_text,
-        file_name=f"Audit_{datetime.now().strftime('%m%d')}.txt",
-        mime="text/plain",
-        use_container_width=True
-    )
-
-    st.sidebar.download_button(
-        label="📊 Save as CSV (Excel)",
-        data=csv_data,
+        label="📊 Download CSV (Backup)",
+        data=df_logs.to_csv(index=False).encode('utf-8'),
         file_name=f"Audit_{datetime.now().strftime('%m%d')}.csv",
         mime="text/csv",
         use_container_width=True
     )
     
-    # --- 3. THE MANUAL CLEAR ---
-    # Since data is now permanent, you NEED a button to delete it for the next audit
-    if st.sidebar.button("🚨 Finish & Clear ALL Data", use_container_width=True):
-        local_storage.delete("audit_backup")
+    if st.sidebar.button("🗑️ Clear Local App View", use_container_width=True):
         st.session_state.logs = []
         st.rerun()
-else:
-    st.sidebar.info("Logs are saved automatically to your browser memory.")
