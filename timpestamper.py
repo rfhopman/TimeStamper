@@ -5,19 +5,26 @@ from datetime import datetime
 from streamlit_local_storage import LocalStorage
 
 # --- Setup ---
-st.set_page_config(page_title="Audit Notes Pro", layout="centered")
+st.set_page_config(page_title="Audit Pro 153", layout="centered")
 
-# Initialize LocalStorage component
+# 1. Initialize the component
 local_storage = LocalStorage()
 
-# --- 1. THE RECOVERY LOGIC ---
-# This pulls data from the phone's browser memory back into the app
+# 2. SAFE RECOVERY LOGIC
 if 'logs' not in st.session_state:
-    stored_data = local_storage.get("audit_backup")
-    if stored_data:
-        st.session_state.logs = stored_data
-    else:
-        st.session_state.logs = []
+    st.session_state.logs = []
+    
+    # We use a try/except block to catch the "handshake" error
+    try:
+        stored_data = local_storage.get("audit_backup")
+        # If stored_data is a list and not empty, load it
+        if stored_data and isinstance(stored_data, list):
+            st.session_state.logs = stored_data
+    except Exception:
+        # If the browser isn't ready, we just start with an empty list
+        # The next time you "Add to Note", it will sync up
+        pass
+        
 # --- THE COMPLETE 1-153 QUESTION DATABASE ---
 AUDIT_QUESTIONS = {
     # 1-23: Hostess & Initial Bar
