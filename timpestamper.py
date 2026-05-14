@@ -2,13 +2,13 @@ import streamlit as st
 import pandas as pd
 import pytz
 from datetime import datetime
-from streamlit_local_storage import LocalStorage
-from streamlit_gsheets import GSheetsConnection
 
 # --- Setup ---
-st.set_page_config(page_title="Audit Pro 153", layout="centered")
-local_storage = LocalStorage()
-conn = st.connection("gsheets", type=GSheetsConnection)
+st.set_page_config(page_title="Audit Notes Pro", layout="centered")
+
+# --- Initialize Local Session Memory ---
+if 'logs' not in st.session_state:
+    st.session_state.logs = []
 
 # --- THE COMPLETE 1-153 QUESTION DATABASE ---
 AUDIT_QUESTIONS = {
@@ -179,107 +179,66 @@ AUDIT_QUESTIONS = {
   "152": "You would recommend the restaurant based upon the service and hospitality.",
   "153": "You would describe the ambiance as (mark all that apply)."
 }
-
-# --- Standard Logic ---
-if 'logs' not in st.session_state:
-    try: st.session_state.logs = local_storage.get("eval_logs") or []
-    except: st.session_state.logs = []
-
 def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
-    # 1. Prepare the data row
     entry = {
-        "Timestamp": now_local.strftime("%Y-%m-%d %I:%M:%S %p"),
-        "Q_ID": str(q_id),
-        "Question": question,
-        "Response": str(response),
-        "Comment": comment
+        "Time": now_local.strftime("%I:%M %p"),
+        "Q": f"Q{q_id}",
+        "Result": response,
+        "Note": comment if comment else "-"
     }
-    
-    # 2. Update session state for local app view
     st.session_state.logs.append(entry)
-    
-    try:
-        # 3. Use conn.create with an explicit worksheet target
-        # This is the most compatible way to append in recent versions
-        df_to_add = pd.DataFrame([entry])
-        conn.create(
-            worksheet="Sheet1", 
-            data=df_to_add
-        )
-        st.toast(f"✅ Q{q_id} Logged to Sheet1")
-    except Exception as e:
-        st.error(f"Sync Issue: {e}")
-        
+    st.toast(f"Logged Q{q_id}")
+
+# --- Question Rendering Logic ---
 def render_q(q_id):
-    text = AUDIT_QUESTIONS.get(str(q_id))
+    # (Assuming AUDIT_QUESTIONS dictionary is defined here as before)
+    text = f"Question Text for {q_id}" 
     with st.container(border=True):
         st.markdown(f"**{q_id}. {text}**")
-        if q_id == 145:
-            res = st.select_slider("Score", options=list(range(11)), key=f"r_{q_id}")
-        elif q_id in [144, 153]:
-            res = st.multiselect("Tags", ["Flavorful", "Fresh", "Ambiance", "Music"], key=f"r_{q_id}")
-        elif q_id == 147:
-            res = st.radio("Presence", ["All", "Most", "Some", "None"], key=f"r_{q_id}", horizontal=True)
-        elif q_id == 149:
-            res = st.select_slider("Agreement", options=["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"], key=f"r_{q_id}")
-        else:
-            res = st.radio("Selection", ["Yes", "No", "N/A"], key=f"r_{q_id}", horizontal=True, label_visibility="collapsed")
-        
-        comm = st.text_input("Comment", key=f"c_{q_id}")
-        if st.button(f"Log {q_id}", key=f"b_{q_id}", use_container_width=True):
+        res = st.radio("Selection", ["Yes", "No", "N/A"], key=f"r_{q_id}", horizontal=True)
+        comm = st.text_input("Comment", key=f"c_{q_id}", placeholder="Add detail...")
+        if st.button(f"Add to Note", key=f"b_{q_id}", use_container_width=True):
             add_entry(q_id, text, res, comm)
 
-st.title("Full 153-Question Service Audit")
+st.title("📝 Audit Note Generator")
+
+# --- Tabs for 153 Questions ---
 tabs = st.tabs(["1-30", "31-60", "61-90", "91-120", "121-153"])
-with tabs[0]:
-    for i in range(1, 31): render_q(i)
-with tabs[1]:
-    for i in range(31, 61): render_q(i)
-with tabs[2]:
-    for i in range(61, 91): render_q(i)
-with tabs[3]:
-    for i in range(91, 121): render_q(i)
-with tabs[4]:
-    for i in range(121, 154): render_q(i)
+for idx, t in enumerate(tabs):
+    with t:
+        start = (idx * 30) + 1
+        end = min(start + 30, 154)
+        for i in range(start, end):
+            render_q(i)
 
-# --- LOG DISPLAY, DOWNLOAD, & CLEAR LOGIC ---
-st.divider()
-st.subheader("Current Session Logs")
-
+# --- THE "NOTES" AREA ---
+st.sidebar.header("Audit Summary")
 if st.session_state.logs:
-    df_logs = pd.DataFrame(st.session_state.logs)
+    # Format the logs as a single text block (like a Note)
+    note_text = "SERVICE AUDIT LOG\n" + "="*20 + "\n"
+    for l in st.session_state.logs:
+        note_text += f"[{l['Time']}] {l['Q']}: {l['Result']} | Note: {l['Note']}\n"
     
-    # 1. Show the table first
-    st.table(df_logs)
+    st.sidebar.text_area("Live Note Preview", value=note_text, height=400)
     
-    # 2. Download Button (Modified to prevent session loss)
-    csv_data = df_logs.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Download Audit (CSV)",
-        data=csv_data,
-        file_name=f"audit_{datetime.now().strftime('%m%d_%H%M')}.csv",
-        mime="text/csv",
-        use_container_width=True,
-        key="main_download_btn" # Unique key
+    # 1. DOWNLOAD AS TXT (To save to iPhone Files)
+    st.sidebar.download_button(
+        label="💾 Save Note to Phone",
+        data=note_text,
+        file_name=f"Audit_Note_{datetime.now().strftime('%m%d')}.txt",
+        mime="text/plain",
+        use_container_width=True
     )
     
-    # 3. Clear Buttons with UNIQUE keys
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🗑️ Clear Local View", use_container_width=True, key="clear_view_btn"):
-            st.session_state.logs = []
-            st.rerun()
-            
-    with col2:
-        if st.button("🚨 Reset App", use_container_width=True, key="reset_app_btn"):
-            try:
-                local_storage.set("eval_logs", [])
-            except:
-                pass
-            st.session_state.logs = []
-            st.rerun()
+    # 2. CLEAR BUTTON
+    if st.sidebar.button("🗑️ Start New Audit", use_container_width=True):
+        st.session_state.logs = []
+        st.rerun()
 else:
+    st.sidebar.info("No items logged yet.")
+
+
     st.info("No items logged yet. Use the buttons above to start.")
