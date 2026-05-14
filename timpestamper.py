@@ -2,14 +2,22 @@ import streamlit as st
 import pandas as pd
 import pytz
 from datetime import datetime
+from streamlit_local_storage import LocalStorage
 
 # --- Setup ---
 st.set_page_config(page_title="Audit Notes Pro", layout="centered")
 
-# --- Initialize Local Session Memory ---
-if 'logs' not in st.session_state:
-    st.session_state.logs = []
+# Initialize LocalStorage component
+local_storage = LocalStorage()
 
+# --- 1. THE RECOVERY LOGIC ---
+# This pulls data from the phone's browser memory back into the app
+if 'logs' not in st.session_state:
+    stored_data = local_storage.get("audit_backup")
+    if stored_data:
+        st.session_state.logs = stored_data
+    else:
+        st.session_state.logs = []
 # --- THE COMPLETE 1-153 QUESTION DATABASE ---
 AUDIT_QUESTIONS = {
     # 1-23: Hostess & Initial Bar
@@ -180,9 +188,7 @@ AUDIT_QUESTIONS = {
    "153": "You would describe the ambiance as (mark all that apply)."
 }
 
-# --- Fixed Function with Proper Indentation ---
 def add_entry(q_id, question, response, comment=""):
-    # Everything below this line MUST be indented
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
@@ -194,16 +200,17 @@ def add_entry(q_id, question, response, comment=""):
         "Note": comment if comment else "-"
     }
     st.session_state.logs.append(entry)
-    st.toast(f"✅ Logged Q{q_id}")
+    
+    # --- 2. THE PERSISTENCE STEP ---
+    # Every time a question is logged, we save the whole list to the phone's memory
+    local_storage.set("audit_backup", st.session_state.logs)
+    st.toast(f"✅ Saved to Phone Memory: Q{q_id}")
 
 def render_q(q_id):
-    # This now pulls the REAL text from the dictionary above
     text = AUDIT_QUESTIONS.get(str(q_id), "Question not found")
-    
     with st.container(border=True):
         st.markdown(f"**{q_id}. {text}**")
         
-        # Logic for special question types
         if q_id == 145:
             res = st.select_slider("Score", options=list(range(11)), key=f"r_{q_id}")
         elif q_id in [144, 153]:
@@ -211,14 +218,13 @@ def render_q(q_id):
         else:
             res = st.radio("Selection", ["Yes", "No", "N/A"], key=f"r_{q_id}", horizontal=True)
             
-        comm = st.text_input("Comment", key=f"c_{q_id}", placeholder="Add detail...")
-        
+        comm = st.text_input("Comment", key=f"c_{q_id}")
         if st.button(f"Add to Note", key=f"b_{q_id}", use_container_width=True):
             add_entry(q_id, text, res, comm)
 
-st.title("📝 Audit Note Generator")
+st.title("📝 Persistent Audit Note")
 
-# --- Tabs for 153 Questions ---
+# --- Tabs ---
 tabs = st.tabs(["1-30", "31-60", "61-90", "91-120", "121-153"])
 for idx, t in enumerate(tabs):
     with t:
@@ -227,22 +233,21 @@ for idx, t in enumerate(tabs):
         for i in range(start, end):
             render_q(i)
 
-# --- SIDEBAR: NOTES & CSV DOWNLOAD ---
+# --- SIDEBAR ---
 st.sidebar.header("Audit Summary")
 
 if st.session_state.logs:
-    # 1. Format for Text Note
+    # Text Note Preview
     note_text = "SERVICE AUDIT LOG\n" + "="*20 + "\n"
     for l in st.session_state.logs:
         note_text += f"[{l['Time']}] {l['Q_ID']}: {l['Result']} | Note: {l['Note']}\n"
     
     st.sidebar.text_area("Live Note Preview", value=note_text, height=300)
     
-    # 2. Prepare CSV Data
+    # CSV Data
     df_logs = pd.DataFrame(st.session_state.logs)
     csv_data = df_logs.to_csv(index=False).encode('utf-8')
     
-    # 3. Download Buttons
     st.sidebar.download_button(
         label="💾 Save as Text (Notes)",
         data=note_text,
@@ -259,8 +264,11 @@ if st.session_state.logs:
         use_container_width=True
     )
     
-    if st.sidebar.button("🗑️ Start New Audit", use_container_width=True):
+    # --- 3. THE MANUAL CLEAR ---
+    # Since data is now permanent, you NEED a button to delete it for the next audit
+    if st.sidebar.button("🚨 Finish & Clear ALL Data", use_container_width=True):
+        local_storage.delete("audit_backup")
         st.session_state.logs = []
         st.rerun()
 else:
-    st.sidebar.info("No items logged yet. Questions will appear here as you add them.")
+    st.sidebar.info("Logs are saved automatically to your browser memory.")
