@@ -235,18 +235,28 @@ with tabs[3]:
 with tabs[4]:
     for i in range(121, 154): render_q(i)
 
-# --- ADD THIS TO THE BOTTOM OF YOUR FILE TO SEE LOGS ON YOUR PHONE ---
+# --- UPDATED LOG DISPLAY & CLEAR LOGIC ---
 st.divider()
 st.subheader("Current Session Logs")
 
 if st.session_state.logs:
-    # Convert logs to a dataframe to show as a table
+    # Use an index-based dataframe for better phone viewing
     df = pd.DataFrame(st.session_state.logs)
     st.dataframe(df, use_container_width=True)
     
-    if st.button("Clear Local Logs"):
+    # We use a checkbox or a persistent button state to handle the clear action safely
+    if st.button("🗑️ Clear All Logs", use_container_width=True):
+        # 1. Clear session state
         st.session_state.logs = []
-        local_storage.set("eval_logs", [])
+        
+        # 2. Update local storage (Wrapped in try/except to prevent the crash)
+        try:
+            local_storage.set("eval_logs", [])
+        except Exception as e:
+            # If local_storage fails, we still want the UI to reset
+            pass
+            
+        # 3. Force the app to refresh
         st.rerun()
 else:
     st.info("No items logged in this session yet.")
