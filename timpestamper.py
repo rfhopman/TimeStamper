@@ -185,7 +185,6 @@ if 'logs' not in st.session_state:
     try: st.session_state.logs = local_storage.get("eval_logs") or []
     except: st.session_state.logs = []
 
-# --- REPLACED add_entry function ---
 def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
@@ -198,19 +197,23 @@ def add_entry(q_id, question, response, comment=""):
         "Comment": comment
     }
     
-    # Save to session state
+    # Save to session state for local app view
     st.session_state.logs.append(entry)
     
     try:
-        # We use .update() to append to the existing Sheet1
-        # Important: Ensure Row 1 of your sheet has these exact headers
-        df_to_add = pd.DataFrame([entry])
-        conn.update(worksheet="Sheet1", data=df_to_add)
-        st.toast(f"✅ Q{q_id} Saved to Google")
+        # 1. Convert entry to DataFrame
+        df_to_append = pd.DataFrame([entry])
+        
+        # 2. Use conn.create with the spreadsheet URL and worksheet name
+        # In the streamlit-gsheets library, 'create' with an existing sheet 
+        # and a worksheet name often handles appending better than update.
+        conn.create(
+            worksheet="Sheet1", 
+            data=df_to_append
+        )
+        st.toast(f"✅ Q{q_id} Added to Bottom")
     except Exception as e:
-        # Shows exactly why it fails instead of a generic error
         st.error(f"Sync Issue: {e}")
-
 def render_q(q_id):
     text = AUDIT_QUESTIONS.get(str(q_id))
     with st.container(border=True):
