@@ -197,23 +197,24 @@ def add_entry(q_id, question, response, comment=""):
         "Comment": comment
     }
     
-    # Save to session state for local app view
+    # Save to session state for local display
     st.session_state.logs.append(entry)
     
     try:
         # 1. Convert entry to DataFrame
         df_to_append = pd.DataFrame([entry])
         
-        # 2. Use conn.create with the spreadsheet URL and worksheet name
-        # In the streamlit-gsheets library, 'create' with an existing sheet 
-        # and a worksheet name often handles appending better than update.
-        conn.create(
+        # 2. Use conn.update instead of conn.create
+        # This will append the data to the existing Sheet1
+        conn.update(
             worksheet="Sheet1", 
-            data=df_to_append
+            data=df_to_append,
+            ttl=0
         )
-        st.toast(f"✅ Q{q_id} Added to Bottom")
+        st.toast(f"✅ Q{q_id} Logged to Google Sheets")
     except Exception as e:
         st.error(f"Sync Issue: {e}")
+        
 def render_q(q_id):
     text = AUDIT_QUESTIONS.get(str(q_id))
     with st.container(border=True):
