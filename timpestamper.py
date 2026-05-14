@@ -234,3 +234,19 @@ with tabs[3]:
     for i in range(91, 121): render_q(i)
 with tabs[4]:
     for i in range(121, 154): render_q(i)
+
+# --- ADD THIS TO THE BOTTOM OF YOUR FILE TO SEE LOGS ON YOUR PHONE ---
+st.divider()
+st.subheader("Current Session Logs")
+
+if st.session_state.logs:
+    # Convert logs to a dataframe to show as a table
+    df = pd.DataFrame(st.session_state.logs)
+    st.dataframe(df, use_container_width=True)
+    
+    if st.button("Clear Local Logs"):
+        st.session_state.logs = []
+        local_storage.set("eval_logs", [])
+        st.rerun()
+else:
+    st.info("No items logged in this session yet.")
