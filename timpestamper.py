@@ -189,27 +189,31 @@ def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
-    entry = {
-        "Timestamp": now_local.strftime("%Y-%m-%d %I:%M:%S %p"),
-        "Q_ID": str(q_id),
-        "Question": question,
-        "Response": str(response),
-        "Comment": comment
-    }
+    # Prepare the data row as a simple list
+    row_data = [
+        now_local.strftime("%Y-%m-%d %I:%M:%S %p"),
+        str(q_id),
+        question,
+        str(response),
+        comment
+    ]
     
-    # Save to session state for local display
-    st.session_state.logs.append(entry)
+    # 1. Update local session state so it shows in the app
+    st.session_state.logs.append({
+        "Timestamp": row_data[0],
+        "Q_ID": row_data[1],
+        "Question": row_data[2],
+        "Response": row_data[3],
+        "Comment": row_data[4]
+    })
     
     try:
-        # 1. Convert entry to DataFrame
-        df_to_append = pd.DataFrame([entry])
+        # 2. Use the internal gspread client to append the row directly
+        # This bypasses the Streamlit wrapper and forces a real "append"
+        client = conn._instance  
+        sheet = client.open("Service_Logs").worksheet("Sheet1")
+        sheet.append_row(row_data)
         
-        # 2. Use append_wd to add a new row at the bottom
-        # This prevents the previous row from being overwritten
-        conn.append_wd(
-            worksheet="Sheet1", 
-            data=df_to_append
-        )
         st.toast(f"✅ Q{q_id} Appended to Google Sheets")
     except Exception as e:
         st.error(f"Sync Issue: {e}")
