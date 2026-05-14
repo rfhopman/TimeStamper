@@ -185,7 +185,7 @@ if 'logs' not in st.session_state:
     try: st.session_state.logs = local_storage.get("eval_logs") or []
     except: st.session_state.logs = []
 
-ddef add_entry(q_id, question, response, comment=""):
+def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
