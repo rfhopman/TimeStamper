@@ -189,7 +189,7 @@ def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
-    # Prepare the data row as a dictionary
+    # 1. Prepare the data row
     entry = {
         "Timestamp": now_local.strftime("%Y-%m-%d %I:%M:%S %p"),
         "Q_ID": str(q_id),
@@ -198,18 +198,18 @@ def add_entry(q_id, question, response, comment=""):
         "Comment": comment
     }
     
-    # 1. Update local session state so it shows in the app
+    # 2. Update session state for local app view
     st.session_state.logs.append(entry)
     
     try:
-        # 2. Use the correct connection method to append data
-        # This targets the existing Sheet1 and adds a new row at the bottom
-        df_to_append = pd.DataFrame([entry])
-        conn.append_wd(
+        # 3. Use conn.create with an explicit worksheet target
+        # This is the most compatible way to append in recent versions
+        df_to_add = pd.DataFrame([entry])
+        conn.create(
             worksheet="Sheet1", 
-            data=df_to_append
+            data=df_to_add
         )
-        st.toast(f"✅ Q{q_id} Appended to Google Sheets")
+        st.toast(f"✅ Q{q_id} Logged to Sheet1")
     except Exception as e:
         st.error(f"Sync Issue: {e}")
         
