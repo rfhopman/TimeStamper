@@ -206,7 +206,7 @@ def add_entry(q_id, question, response, comment=""):
         # This is the most compatible way to append in recent versions
         df_to_add = pd.DataFrame([entry])
         conn.create(
-            worksheet="Sheet1", 
+            worksheet="Sheet2", 
             data=df_to_add
         )
         st.toast(f"✅ Q{q_id} Logged to Sheet1")
