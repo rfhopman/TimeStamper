@@ -256,14 +256,28 @@ if st.button("🗑️ Clear All Logs", use_container_width=True):
         
     st.rerun()
 
+# --- LOG DISPLAY, DOWNLOAD, & CLEAR LOGIC ---
 st.divider()
 st.subheader("Current Session Logs")
 
 if st.session_state.logs:
-    # Display logs as a table
-    st.table(pd.DataFrame(st.session_state.logs))
+    # 1. Create a DataFrame for display and download
+    df_logs = pd.DataFrame(st.session_state.logs)
     
-    # Safe way to clear the view without using local_storage
+    # 2. Add a Download Button (Works on iPhone)
+    csv = df_logs.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Audit as CSV",
+        data=csv,
+        file_name=f"audit_log_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+    # 3. Display the logs in a table
+    st.table(df_logs)
+    
+    # 4. Safe Clear Logic (Removed local_storage to prevent crashes)
     if st.button("🗑️ Clear Local View", use_container_width=True):
         st.session_state.logs = []
         st.rerun()
