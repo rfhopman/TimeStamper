@@ -185,7 +185,7 @@ if 'logs' not in st.session_state:
     try: st.session_state.logs = local_storage.get("eval_logs") or []
     except: st.session_state.logs = []
 
-def add_entry(q_id, question, response, comment=""):
+ddef add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
@@ -197,27 +197,22 @@ def add_entry(q_id, question, response, comment=""):
         "Comment": comment
     }
     
-    # Save to session state for local app view
+    # Save to session state for local display
     st.session_state.logs.append(entry)
     
     try:
         # 1. Convert entry to DataFrame
         df_to_append = pd.DataFrame([entry])
         
-        # 2. Use conn.append_wd (Append With Data) 
-        # This is the most reliable way to add a row to the bottom without overwriting
+        # 2. Use append_wd to add a new row at the bottom
+        # This prevents the previous row from being overwritten
         conn.append_wd(
             worksheet="Sheet1", 
             data=df_to_append
         )
-        st.toast(f"✅ Q{q_id} Logged to Google Sheets")
+        st.toast(f"✅ Q{q_id} Appended to Google Sheets")
     except Exception as e:
-        # If append_wd fails, fall back to update without the ttl argument
-        try:
-            conn.update(worksheet="Sheet1", data=df_to_append)
-            st.toast(f"✅ Q{q_id} Updated in Google Sheets")
-        except Exception as update_err:
-            st.error(f"Sync Issue: {update_err}")
+        st.error(f"Sync Issue: {e}")
         
 def render_q(q_id):
     text = AUDIT_QUESTIONS.get(str(q_id))
