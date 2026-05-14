@@ -12,7 +12,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- THE COMPLETE 1-153 QUESTION DATABASE ---
 AUDIT_QUESTIONS = {
-    # 1-13: Hostess & Initial Bar
+    # 1-23: Hostess & Initial Bar
     "1": "Guest greeted at podium with a smile and welcome.",
     "2": "Host initiated greeting.",
     "3": "Guest acknowledged with smile/gesture if you were in line.",
@@ -37,7 +37,7 @@ AUDIT_QUESTIONS = {
     "22": "Outside entry was clean.",
     "23": "Lobby/entry area was well lit and clean.",
 
-    # 24-5: Bar Service & Table Transition
+    # 24-65: Bar Service & Table Transition
     "24": "Bartender smiled and maintained eye contact.",
     "25": "Bartender was helpful and knowledgeable about coctails and wines.",
     "26": "Bartender greeted you within one minute of your arrival at the bar.",
