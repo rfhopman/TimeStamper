@@ -235,28 +235,17 @@ with tabs[3]:
 with tabs[4]:
     for i in range(121, 154): render_q(i)
 
-# --- UPDATED LOG DISPLAY & CLEAR LOGIC ---
-st.divider()
-st.subheader("Current Session Logs")
-
-if st.session_state.logs:
-    # Use an index-based dataframe for better phone viewing
-    df = pd.DataFrame(st.session_state.logs)
-    st.dataframe(df, use_container_width=True)
+# --- Updated Clear Logic to prevent AttributeError ---
+if st.button("🗑️ Clear All Logs", use_container_width=True):
+    # 1. Clear session state immediately
+    st.session_state.logs = []
     
-    # We use a checkbox or a persistent button state to handle the clear action safely
-    if st.button("🗑️ Clear All Logs", use_container_width=True):
-        # 1. Clear session state
-        st.session_state.logs = []
-        
-        # 2. Update local storage (Wrapped in try/except to prevent the crash)
-        try:
+    # 2. Safely update local storage
+    try:
+        if local_storage:
             local_storage.set("eval_logs", [])
-        except Exception as e:
-            # If local_storage fails, we still want the UI to reset
-            pass
-            
-        # 3. Force the app to refresh
-        st.rerun()
-else:
-    st.info("No items logged in this session yet.")
+    except Exception:
+        # Ignore errors here so the app doesn't crash on your phone
+        pass
+        
+    st.rerun()
