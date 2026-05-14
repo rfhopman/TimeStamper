@@ -23,11 +23,11 @@ AUDIT_QUESTIONS = {
     "8": "If there was a delay,the manager updates the guest.",
     "9": "Cocktails/drinks carried by restaurant employee to the table.",
     "10": "Host made pleasant conversation on the way to the table (min. 10 pace distance).",
-    "11": "Bar staff offered a specific cocktail/beverage.",
-    "12": "Drinks delivered to bar guest within 3 minutes.",
-    "13": "Napkin/Coaster placed before drink service.",
-    "14": "Bar snacks offered or provided.",
-    "15": "Bar menu offered for food.",
+    "11": "Host pulled out chair or positioned table for the guest (N/A for booths).",
+    "12": "All guests were seated before host departed.",
+    "13": "Menus were handed to each guest once all were seated.",
+    "14": "Host wished a you a pleasant dinner/meal.",
+    "15": "You were advised of the presence of stairs or other obstacles before approaching them.",
 
     # 16-45: Bar Service & Table Transition
     "16": "Bartender knowledgeable about the menu/spirits.",
