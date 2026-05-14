@@ -185,12 +185,12 @@ if 'logs' not in st.session_state:
     try: st.session_state.logs = local_storage.get("eval_logs") or []
     except: st.session_state.logs = []
 
+# --- REPLACED add_entry function ---
 def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
-    # 1. Create the data row (Ensure keys match your Row 1 headers exactly)
-    entry_dict = {
+    entry = {
         "Timestamp": now_local.strftime("%Y-%m-%d %I:%M:%S %p"),
         "Q_ID": str(q_id),
         "Question": question,
@@ -198,20 +198,17 @@ def add_entry(q_id, question, response, comment=""):
         "Comment": comment
     }
     
-    # 2. Update local app view
-    st.session_state.logs.append(entry_dict)
+    # Save to session state
+    st.session_state.logs.append(entry)
     
     try:
-        # 3. Target "Sheet1" specifically to prevent new sheet creation
-        # We convert to a list of values to use the underlying gspread append
-        new_row_df = pd.DataFrame([entry_dict])
-        
-        conn.update(
-            worksheet="Sheet1", 
-            data=new_row_df
-        )
-        st.toast(f"✅ Q{q_id} Synced to Sheet1")
+        # We use .update() to append to the existing Sheet1
+        # Important: Ensure Row 1 of your sheet has these exact headers
+        df_to_add = pd.DataFrame([entry])
+        conn.update(worksheet="Sheet1", data=df_to_add)
+        st.toast(f"✅ Q{q_id} Saved to Google")
     except Exception as e:
+        # Shows exactly why it fails instead of a generic error
         st.error(f"Sync Issue: {e}")
 
 def render_q(q_id):
@@ -261,43 +258,30 @@ if st.button("🗑️ Clear All Logs", use_container_width=True):
         
     st.rerun()
 
-# --- LOG DISPLAY, DOWNLOAD, & CLEAR LOGIC ---
+# --- REPLACED bottom section (after the tabs) ---
 st.divider()
 st.subheader("Current Session Logs")
 
 if st.session_state.logs:
-    # 1. Create a DataFrame for display and download
     df_logs = pd.DataFrame(st.session_state.logs)
     
-    # 2. Add a Download Button (Works on iPhone)
-    csv = df_logs.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Download Audit as CSV",
-        data=csv,
-        file_name=f"audit_log_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-
-    # 3. Display the logs in a table
+    # Show the table BEFORE the download button so it doesn't disappear
     st.table(df_logs)
     
-    # 4. Safe Clear Logic (Removed local_storage to prevent crashes)
-    if st.button("🗑️ Clear Local View", use_container_width=True):
+    # Create the CSV data
+    csv_data = df_logs.to_csv(index=False).encode('utf-8')
+    
+    # This button allows you to save the file without leaving the app
+    st.download_button(
+        label="📥 Download & Backup Audit (CSV)",
+        data=csv_data,
+        file_name=f"audit_backup_{datetime.now().strftime('%H%M')}.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+    
+    if st.button("🗑️ Clear All Logs", use_container_width=True):
         st.session_state.logs = []
         st.rerun()
 else:
     st.info("No items logged yet. Use the buttons above to start.")
-
-st.divider()
-if st.session_state.logs:
-    df_export = pd.DataFrame(st.session_state.logs)
-    csv = df_export.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        "📥 Download Full Audit (CSV)",
-        data=csv,
-        file_name="service_audit.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-    st.table(df_export)
