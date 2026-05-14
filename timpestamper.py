@@ -189,32 +189,25 @@ def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
-    # 1. Create the data row
-    new_row = pd.DataFrame([{
+    entry = {
         "Timestamp": now_local.strftime("%Y-%m-%d %I:%M:%S %p"),
-        "Q_ID": str(q_id), # Keeping as string to avoid formatting issues
+        "Q_ID": str(q_id),
         "Question": question,
         "Response": str(response),
         "Comment": comment
-    }])
+    }
     
-    # 2. Log to local session state first
-    st.session_state.logs.append(new_row.to_dict('records')[0])
+    # Save to session state so it shows up in the app immediately
+    st.session_state.logs.append(entry)
     
     try:
-        # Update local browser storage
-        local_storage.set("eval_logs", st.session_state.logs)
-        
-        # 3. Use 'append' logic specifically for the 'Service_Logs' sheet
-        # This is more stable than .create() in newer Streamlit versions
-        conn.create(
-            worksheet="Sheet1", # Ensure this matches your tab name at the bottom of the Sheet
-            data=new_row
-        )
-        st.toast(f"✅ Q{q_id} Logged to Google")
+        # Sync to Google Sheets
+        # Note: Ensure worksheet name matches your tab (e.g., "Sheet1")
+        conn.create(data=pd.DataFrame([entry]))
+        st.toast(f"✅ Q{q_id} Logged")
     except Exception as e:
-        # Show the actual error so we can see why Google is rejecting it
-        st.error(f"Google Sync Error: {str(e)}")
+        # This prevents the app from crashing if Google Sync fails
+        st.error(f"Sync Issue: {e}")
 
 def render_q(q_id):
     text = AUDIT_QUESTIONS.get(str(q_id))
@@ -262,3 +255,17 @@ if st.button("🗑️ Clear All Logs", use_container_width=True):
         pass
         
     st.rerun()
+
+st.divider()
+st.subheader("Current Session Logs")
+
+if st.session_state.logs:
+    # Display logs as a table
+    st.table(pd.DataFrame(st.session_state.logs))
+    
+    # Safe way to clear the view without using local_storage
+    if st.button("🗑️ Clear Local View", use_container_width=True):
+        st.session_state.logs = []
+        st.rerun()
+else:
+    st.info("No items logged yet. Use the buttons above to start.")
