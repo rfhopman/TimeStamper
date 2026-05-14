@@ -189,7 +189,8 @@ def add_entry(q_id, question, response, comment=""):
     local_tz = pytz.timezone('America/Aruba') 
     now_local = datetime.now(pytz.utc).astimezone(local_tz)
     
-    entry = {
+    # 1. Create the data row (Ensure keys match your Row 1 headers exactly)
+    entry_dict = {
         "Timestamp": now_local.strftime("%Y-%m-%d %I:%M:%S %p"),
         "Q_ID": str(q_id),
         "Question": question,
@@ -197,16 +198,20 @@ def add_entry(q_id, question, response, comment=""):
         "Comment": comment
     }
     
-    # Save to session state so it shows up in the app immediately
-    st.session_state.logs.append(entry)
+    # 2. Update local app view
+    st.session_state.logs.append(entry_dict)
     
     try:
-        # Sync to Google Sheets
-        # Note: Ensure worksheet name matches your tab (e.g., "Sheet1")
-        conn.create(data=pd.DataFrame([entry]))
-        st.toast(f"✅ Q{q_id} Logged")
+        # 3. Target "Sheet1" specifically to prevent new sheet creation
+        # We convert to a list of values to use the underlying gspread append
+        new_row_df = pd.DataFrame([entry_dict])
+        
+        conn.update(
+            worksheet="Sheet1", 
+            data=new_row_df
+        )
+        st.toast(f"✅ Q{q_id} Synced to Sheet1")
     except Exception as e:
-        # This prevents the app from crashing if Google Sync fails
         st.error(f"Sync Issue: {e}")
 
 def render_q(q_id):
@@ -283,3 +288,16 @@ if st.session_state.logs:
         st.rerun()
 else:
     st.info("No items logged yet. Use the buttons above to start.")
+
+st.divider()
+if st.session_state.logs:
+    df_export = pd.DataFrame(st.session_state.logs)
+    csv = df_export.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        "📥 Download Full Audit (CSV)",
+        data=csv,
+        file_name="service_audit.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+    st.table(df_export)
