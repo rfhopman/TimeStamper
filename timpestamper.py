@@ -28,7 +28,7 @@ AUDIT_QUESTIONS = {
     "13": "Menus were handed to each guest once all were seated.",
     "14": "Host wished a you a pleasant dinner/meal.",
     "15": "You were advised of the presence of stairs or other obstacles before approaching them.",
-    "16": "BHost attentive to all entering/exiting guests.",
+    "16": "Host attentive to all entering/exiting guests.",
     "17": "You received a sincere farewell upon departure.",
     "18": "Shirt/Slacks/Dresses; pressed,hair was neat.",
     "19": "Host had pleasant physical appearance.",
